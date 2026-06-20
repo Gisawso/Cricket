@@ -3,286 +3,44 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>CricketScore - Live Cloud Tracker</title>
+    <title>CricketScore</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-        body { 
-            font-family: 'Inter', sans-serif; 
-            -webkit-tap-highlight-color: transparent; 
-            transition: background-color 0.2s, color 0.2s;
-            overflow: hidden; 
-        }
+        body { font-family: sans-serif; -webkit-tap-highlight-color: transparent; overflow: hidden; }
         .no-sb::-webkit-scrollbar { display: none; }
     </style>
-    <script>
-        tailwind.config = { darkMode: 'class' }
-    </script>
 </head>
-<body class="bg-slate-100 dark:bg-slate-950 text-slate-900 dark:text-slate-50 h-screen w-screen flex flex-col selection:bg-emerald-500 selection:text-slate-950">
+<body class="bg-slate-100 dark:bg-slate-950 text-slate-900 dark:text-slate-50 h-screen w-screen flex flex-col">
 
     <div class="w-full max-w-6xl mx-auto bg-white dark:bg-slate-900 h-full flex flex-col relative md:border-x border-slate-200 dark:border-slate-800 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] shadow-2xl">
         
-        <header class="border-b border-slate-200 dark:border-slate-800 px-6 py-4 flex items-center justify-between z-10 bg-white dark:bg-slate-900">
-            <div class="flex items-center gap-3">
-                <span class="text-2xl">🏏</span>
+        <header class="border-b border-slate-200 dark:border-slate-800 px-6 py-4 flex items-center justify-between">
+            <div class="flex items-center gap-2">
+                <span class="text-xl">🏏</span>
                 <div>
-                    <h1 class="text-lg font-black tracking-tight bg-gradient-to-r from-emerald-500 to-teal-500 bg-clip-text text-transparent">CricketScore</h1>
-                    <p class="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Live Cloud Arena</p>
+                    <h1 class="text-base font-bold bg-gradient-to-r from-emerald-500 to-teal-500 bg-clip-text text-transparent">CricketScore</h1>
                 </div>
             </div>
-            <div class="flex items-center gap-2">
-                <button onclick="app.toggleFS()" class="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:scale-105 transition"><i data-lucide="maximize" id="fs-icon" class="w-4 h-4"></i></button>
-                <button onclick="app.switchView('settings')" class="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:scale-105 transition"><i data-lucide="settings" class="w-4 h-4"></i></button>
+            <div class="flex gap-1">
+                <button onclick="app.toggleFS()" class="p-2 rounded-lg bg-slate-100 dark:bg-slate-800"><i data-lucide="maximize" id="fs-icon" class="w-4 h-4"></i></button>
+                <button onclick="app.switchView('settings')" class="p-2 rounded-lg bg-slate-100 dark:bg-slate-800"><i data-lucide="settings" class="w-4 h-4"></i></button>
             </div>
         </header>
 
         <main id="view-container" class="flex-1 p-6 overflow-y-auto no-sb"></main>
 
         <nav id="app-nav" class="border-t border-slate-200 dark:border-slate-800 grid grid-cols-4 py-3 bg-white dark:bg-slate-900 shadow-xl w-full z-10">
-            <button onclick="app.switchView('dashboard')" id="nav-dashboard" class="flex flex-col items-center gap-1 transition duration-150">
+            <button onclick="app.switchView('dashboard')" id="nav-dashboard" class="flex flex-col items-center gap-1 text-slate-400">
                 <i data-lucide="layout-dashboard" class="w-5 h-5"></i>
-                <span class="text-[10px] font-semibold uppercase tracking-wider">Dashboard</span>
+                <span class="text-[10px] capitalize">Dashboard</span>
             </button>
-            <button onclick="app.switchView('history')" id="nav-history" class="flex flex-col items-center gap-1 transition duration-150">
+            <button onclick="app.switchView('history')" id="nav-history" class="flex flex-col items-center gap-1 text-slate-400">
                 <i data-lucide="history" class="w-5 h-5"></i>
-                <span class="text-[10px] font-semibold uppercase tracking-wider">Ledger</span>
+                <span class="text-[10px] capitalize">History</span>
             </button>
-            <button onclick="app.switchView('tournaments')" id="nav-tournaments" class="flex flex-col items-center gap-1 transition duration-150">
+            <button onclick="app.switchView('tournaments')" id="nav-tournaments" class="flex flex-col items-center gap-1 text-slate-400">
                 <i data-lucide="trophy" class="w-5 h-5"></i>
-                <span class="text-[10px] font-semibold uppercase tracking-wider">Leagues</span>
+                <span class="text-[10px] capitalize">Tournaments</span>
             </button>
-            <button onclick="app.switchView('settings')" id="nav-settings" class="flex flex-col items-center gap-1 transition duration-150">
-                <i data-lucide="sliders-horizontal" class="w-5 h-5"></i>
-                <span class="text-[10px] font-semibold uppercase tracking-wider">Options</span>
-            </button>
-        </nav>
-    </div>
-
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
-
-    <script>
-        // Paste your actual dynamic Firebase Object keys here when ready to deploy:
-        const firebaseConfig = {
-            apiKey: "YOUR_API_KEY",
-            authDomain: "YOUR_AUTH_DOMAIN",
-            databaseURL: "YOUR_DATABASE_URL", 
-            projectId: "YOUR_PROJECT_ID",
-            storageBucket: "YOUR_STORAGE_BUCKET",
-            messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-            appId: "YOUR_APP_ID"
-        };
-
-        // Network Initializer Engine Guard
-        let isFirebaseActive = false;
-        let db = null;
-
-        if (firebaseConfig.apiKey !== "YOUR_API_KEY" && firebaseConfig.databaseURL !== "YOUR_DATABASE_URL") {
-            try {
-                firebase.initializeApp(firebaseConfig);
-                db = firebase.database();
-                isFirebaseActive = true;
-            } catch (e) {
-                console.error("Firebase startup crashed. Falling back to offline engine mode.", e);
-            }
-        }
-
-        class CricketApp {
-            constructor() {
-                // Initialize default application data structures
-                this.history = JSON.parse(localStorage.getItem('cs_local_history')) || []; 
-                this.currentMatch = JSON.parse(localStorage.getItem('cs_local_match')) || null; 
-                this.currentView = 'dashboard';
-                this.theme = localStorage.getItem('cs_theme') || 'system';
-                
-                this.applyTheme();
-                window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => this.theme === 'system' && this.applyTheme());
-                
-                // Instantly render initial structural UI canvas without blocking
-                this.render();
-
-                // Connect to Cloud pipeline stream only if valid config parameters exist
-                if (isFirebaseActive && db) {
-                    db.ref('cricket_hub/').on('value', snap => {
-                        const data = snap.val() || {};
-                        this.history = data.history || []; 
-                        this.currentMatch = data.currentMatch || null;
-                        this.render();
-                    }, error => {
-                        console.warn("Cloud stream locked. Relying on local client render layouts.");
-                    });
-                }
-            }
-
-            toggleFS() {
-                if (!document.fullscreenElement) {
-                    document.documentElement.requestFullscreen().catch(() => {});
-                    document.getElementById('fs-icon').setAttribute('data-lucide', 'minimize');
-                } else {
-                    document.exitFullscreen();
-                    document.getElementById('fs-icon').setAttribute('data-lucide', 'maximize');
-                }
-                lucide.createIcons();
-            }
-
-            setTheme(mode) { 
-                localStorage.setItem('cs_theme', this.theme = mode); 
-                this.applyTheme(); 
-                this.render(); 
-            }
-
-            applyTheme() {
-                const isDark = this.theme === 'dark' || (this.theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
-                document.documentElement.classList.toggle('dark', isDark);
-            }
-
-            save() { 
-                if (isFirebaseActive && db) {
-                    db.ref('cricket_hub/').set({ history: this.history, currentMatch: this.currentMatch }); 
-                } else {
-                    // Failover Offline Cache Engine
-                    localStorage.setItem('cs_local_history', JSON.stringify(this.history));
-                    localStorage.setItem('cs_local_match', JSON.stringify(this.currentMatch));
-                }
-            }
-
-            switchView(view) {
-                this.currentView = view;
-                this.render();
-            }
-
-            updateActiveNavHighlight() {
-                document.querySelectorAll('#app-nav button').forEach(b => {
-                    b.classList.remove('text-emerald-500', 'dark:text-emerald-400');
-                    b.classList.add('text-slate-400');
-                });
-                const currentButton = document.getElementById(`nav-${this.currentView}`);
-                if (currentButton) {
-                    currentButton.classList.remove('text-slate-400');
-                    currentButton.classList.add('text-emerald-500', 'dark:text-emerald-400');
-                }
-            }
-
-            render() {
-                const el = document.getElementById('view-container'); 
-                if (!el) return;
-                this.updateActiveNavHighlight();
-                const m = this.currentMatch;
-                
-                if (this.currentView === 'dashboard') {
-                    el.innerHTML = `
-                        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                            <div class="md:col-span-2 space-y-4">
-                                <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest">Active Match</h3>
-                                ${m ? `
-                                    <div onclick="app.switchView('live-scoring')" class="bg-gradient-to-br from-emerald-500/5 to-teal-500/5 dark:from-emerald-950/20 dark:to-slate-900 border border-emerald-500/30 p-6 rounded-2xl cursor-pointer hover:border-emerald-500 shadow-sm transition group">
-                                        <div class="flex justify-between items-center">
-                                            <span class="text-xs bg-emerald-500 text-slate-950 font-black px-2 py-0.5 rounded-md uppercase">LIVE</span>
-                                            <span class="text-xs font-bold text-slate-400">${m.team1} vs ${m.team2}</span>
-                                        </div>
-                                        <div class="text-5xl font-black tracking-tight my-4 group-hover:scale-[1.01] transition-transform">${m.runs}<span class="text-2xl text-slate-400 font-medium">/${m.wickets}</span></div>
-                                        <div class="text-sm font-semibold text-slate-500 dark:text-slate-400">Overs: <span class="text-slate-900 dark:text-slate-100">${Math.floor(m.balls/6)}.${m.balls%6}</span> of ${m.overs}</div>
-                                    </div>` : `
-                                    <div class="bg-slate-50 dark:bg-slate-800/40 border border-dashed border-slate-300 dark:border-slate-700 p-8 rounded-2xl text-center">
-                                        <p class="text-sm text-slate-400 mb-4">No active match found in cloud database.</p>
-                                        <button onclick="app.switchView('setup-match')" class="bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold py-3 px-6 rounded-xl text-sm transition">Configure New Match</button>
-                                    </div>`}
-                            </div>
-                            
-                            <div class="space-y-4">
-                                <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest">Recent Ledgers</h3>
-                                <div class="space-y-3">
-                                    ${this.history.slice(0, 4).map(h => `
-                                        <div class="p-4 bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-800 rounded-xl text-xs flex justify-between items-center">
-                                            <div>
-                                                <b class="text-sm text-slate-800 dark:text-slate-200">${h.team1} v ${h.team2}</b>
-                                                <p class="text-emerald-500 font-bold mt-0.5">${h.res}</p>
-                                            </div>
-                                            <span class="text-[10px] text-slate-400 font-semibold">${h.date}</span>
-                                        </div>
-                                    `).join('') || '<p class="text-xs text-slate-400 text-center py-4">No match history records loaded.</p>'}
-                                </div>
-                            </div>
-                        </div>`;
-                } 
-                else if (this.currentView === 'setup-match') {
-                    el.innerHTML = `
-                        <div class="max-w-xl mx-auto bg-slate-50 dark:bg-slate-800/30 border border-slate-200 dark:border-slate-800 p-6 rounded-2xl space-y-4 shadow-sm">
-                            <h2 class="text-base font-bold flex items-center gap-2"><i data-lucide="notebook-pen" class="text-emerald-500 w-4 h-4"></i> Match Initialization Setup</h2>
-                            <div class="grid grid-cols-2 gap-3">
-                                <div class="space-y-1">
-                                    <label class="text-[10px] font-bold text-slate-400 uppercase">Batting Team</label>
-                                    <input id="t1" placeholder="Team 1" class="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 p-2.5 rounded-xl text-xs focus:border-emerald-500 outline-none">
-                                </div>
-                                <div class="space-y-1">
-                                    <label class="text-[10px] font-bold text-slate-400 uppercase">Bowling Team</label>
-                                    <input id="t2" placeholder="Team 2" class="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 p-2.5 rounded-xl text-xs focus:border-emerald-500 outline-none">
-                                </div>
-                            </div>
-                            <div class="grid grid-cols-2 gap-3">
-                                <div class="space-y-1">
-                                    <label class="text-[10px] font-bold text-slate-400 uppercase">Striker</label>
-                                    <input id="b1" placeholder="Striker Batsman" class="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 p-2.5 rounded-xl text-xs outline-none">
-                                </div>
-                                <div class="space-y-1">
-                                    <label class="text-[10px] font-bold text-slate-400 uppercase">Non-Striker</label>
-                                    <input id="b2" placeholder="Non-Striker Batsman" class="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 p-2.5 rounded-xl text-xs outline-none">
-                                </div>
-                            </div>
-                            <div class="grid grid-cols-2 gap-3">
-                                <div class="space-y-1">
-                                    <label class="text-[10px] font-bold text-slate-400 uppercase">Opening Bowler</label>
-                                    <input id="bw" placeholder="Bowler" class="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 p-2.5 rounded-xl text-xs outline-none">
-                                </div>
-                                <div class="space-y-1">
-                                    <label class="text-[10px] font-bold text-slate-400 uppercase">Total Overs</label>
-                                    <input id="ov" type="number" value="5" class="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 p-2.5 rounded-xl text-xs outline-none">
-                                </div>
-                            </div>
-                            <button onclick="app.initMatch()" class="w-full bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-black py-3 rounded-xl text-xs uppercase tracking-wider transition mt-2">Initialize Canvas Match</button>
-                        </div>`;
-                } 
-                else if (this.currentView === 'live-scoring') {
-                    if (!m) return this.switchView('dashboard');
-                    el.innerHTML = `
-                        <div class="max-w-2xl mx-auto space-y-6">
-                            <div class="bg-slate-50 dark:bg-slate-800/40 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 flex justify-between items-center shadow-sm">
-                                <div>
-                                    <h2 class="text-2xl font-black tracking-tight">${m.team1}</h2>
-                                    <p class="text-xs text-slate-400 font-semibold mt-1">Bowling: ${m.team2}</p>
-                                </div>
-                                <div class="text-right">
-                                    <div class="text-5xl font-black text-emerald-500 tracking-tight">${m.runs}<span class="text-2xl text-slate-400 font-normal">/${m.wickets}</span></div>
-                                    <p class="text-xs text-slate-400 font-bold mt-1 uppercase">Overs: ${Math.floor(m.balls/6)}.${m.balls%6} / ${m.overs}</p>
-                                </div>
-                            </div>
-                            
-                            <div class="space-y-3">
-                                <div class="grid grid-cols-4 gap-3">
-                                    ${[0, 1, 2, 3].map(r => `<button onclick="app.ball(${r})" class="bg-white dark:bg-slate-800 hover:border-slate-400 dark:hover:border-slate-500 font-black text-xl py-5 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm transition">${r}</button>`).join('')}
-                                </div>
-                                <div class="grid grid-cols-3 gap-3">
-                                    <button onclick="app.ball(4)" class="bg-amber-500/10 text-amber-500 hover:bg-amber-500/20 border border-amber-500/30 font-black text-2xl py-5 rounded-2xl transition">4</button>
-                                    <button onclick="app.ball(6)" class="bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-black text-2xl py-5 rounded-2xl shadow-md transition">6</button>
-                                    <button onclick="app.ball(0, true)" class="bg-rose-500 hover:bg-rose-600 text-white font-black py-5 rounded-2xl shadow-md transition">OUT</button>
-                                </div>
-                            </div>
-                            
-                            <button onclick="app.endMatch()" class="w-full bg-rose-500/10 text-rose-500 hover:bg-rose-500/20 font-bold py-3 rounded-xl border border-rose-500/20 text-xs uppercase tracking-wider transition">Terminate & Archive Match</button>
-                        </div>`;
-                } 
-                else if (this.currentView === 'history') {
-                    el.innerHTML = `
-                        <div class="max-w-2xl mx-auto space-y-4">
-                            <h2 class="text-sm font-bold tracking-widest text-slate-400 uppercase">Historical Match Ledgers</h2>
-                            <div class="space-y-2">
-                                ${this.history.map(h => `<div class="p-4 bg-slate-50 dark:bg-slate-800/30 border border-slate-200 dark:border-slate-800 rounded-xl text-xs flex justify-between items-center"><div><b class="text-sm">${h.team1} vs ${h.team2}</b><p class="text-slate-400 mt-1">Final Scorecard: <span class="text-emerald-500 font-bold">${h.res}</span></p></div><span class="text-slate-400 font-medium">${h.date}</span></div>`).join('') || '<p class="text-xs text-slate-400 text-center py-6">No records archived.</p>'}
-                            </div>
-                        </div>`;
-                }
-                else if (this.currentView === 'tournaments') {
-                    el.innerHTML = `
-                        <div class="max-w-2xl mx-auto text-center py-12 space-y-3">
-                            <div
+            <button onclick="app.switchView('settings')" id="nav-
