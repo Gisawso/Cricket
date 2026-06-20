@@ -1,0 +1,708 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>CricketScore - Professional Match Tracker</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent; }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-50 min-h-screen flex flex-col selection:bg-emerald-500 selection:text-slate-950">
+
+    <div class="w-full max-w-md mx-auto bg-slate-900 min-h-screen shadow-2xl flex flex-col pb-20 relative">
+        
+        <header class="sticky top-0 z-40 bg-slate-900/90 backdrop-blur-md border-b border-slate-800 px-4 py-3 flex items-center justify-between">
+            <div class="flex items-center gap-2">
+                <div class="w-8 h-8 rounded-lg bg-emerald-500 flex items-center justify-center text-slate-950 font-bold text-lg shadow-lg shadow-emerald-500/20">
+                    🏏
+                </div>
+                <div>
+                    <h1 class="text-base font-bold tracking-tight bg-gradient-to-r from-emerald-400 to-teal-400 bg-clip-text text-transparent">CricketScore</h1>
+                    <p class="text-[10px] text-slate-400 font-medium tracking-wide uppercase">Colony & Tournament Hub</p>
+                </div>
+            </div>
+            <button onclick="app.resetToSampleData()" class="text-xs font-semibold bg-slate-800 border border-slate-700 hover:border-emerald-500 text-slate-300 px-2.5 py-1 rounded-md transition-colors">
+                Demo Data
+            </button>
+        </header>
+
+        <main id="view-container" class="flex-1 p-4 overflow-y-auto"></main>
+
+        <nav class="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-slate-900/95 backdrop-blur-md border-t border-slate-800 grid grid-cols-4 py-2 z-40 shadow-xl">
+            <button onclick="app.switchView('dashboard')" id="nav-dashboard" class="flex flex-col items-center gap-1 text-emerald-400">
+                <i data-lucide="layout-dashboard" class="w-5 h-5"></i>
+                <span class="text-[10px] font-medium">Dashboard</span>
+            </button>
+            <button onclick="app.switchView('teams')" id="nav-teams" class="flex flex-col items-center gap-1 text-slate-400">
+                <i data-lucide="users" class="w-5 h-5"></i>
+                <span class="text-[10px] font-medium">Teams</span>
+            </button>
+            <button onclick="app.switchView('history')" id="nav-history" class="flex flex-col items-center gap-1 text-slate-400">
+                <i data-lucide="history" class="w-5 h-5"></i>
+                <span class="text-[10px] font-medium">History</span>
+            </button>
+            <button onclick="app.switchView('tournaments')" id="nav-tournaments" class="flex flex-col items-center gap-1 text-slate-400">
+                <i data-lucide="trophy" class="w-5 h-5"></i>
+                <span class="text-[10px] font-medium">Leagues</span>
+            </button>
+        </nav>
+    </div>
+
+    <script>
+        // Database/State Engine
+        const DB = {
+            get: (key, defaultVal) => JSON.parse(localStorage.getItem('cs_' + key)) || defaultVal,
+            set: (key, val) => localStorage.setItem('cs_' + key, JSON.stringify(val))
+        };
+
+        const initialTeams = [
+            { id: "t1", name: "Mavericks CC", players: ["Amit Sharma", "Rohit Verma", "Vikram Singh", "Deepak Raj", "Sanjay Kumar", "Anil Mehta", "Vijay Kulkarni", "Rajesh Patel", "Sunil Joshi", "Ajay Tyagi", "Manoj Tiwari"] },
+            { id: "t2", name: "Titans XI", players: ["Rahul Dravid", "Sachin Tendulkar", "Sourav Ganguly", "VVS Laxman", "Yuvraj Singh", "MS Dhoni", "Virender Sehwag", "Zaheer Khan", "Anil Kumble", "Harbhajan Singh", "Javagal Srinath"] }
+        ];
+
+        const initialTournaments = [
+            {
+                id: "tourney-1",
+                name: "Summer Premier Cup",
+                teams: ["t1", "t2"],
+                pointsTable: {
+                    "t1": { matches: 1, wins: 1, losses: 0, nrr: 1.25, points: 2 },
+                    "t2": { matches: 1, wins: 0, losses: 1, nrr: -1.25, points: 0 }
+                },
+                schedule: [
+                    { id: "m-sample", team1: "t1", team2: "t2", status: "Completed", result: "Mavericks CC won by 15 runs", date: "2026-06-18" }
+                ]
+            }
+        ];
+
+        const initialHistory = [
+            {
+                id: "m-sample",
+                team1Name: "Mavericks CC",
+                team2Name: "Titans XI",
+                date: "2026-06-18",
+                overs: 5,
+                scorecard: {
+                    team1: { score: 58, wickets: 3, overs: 5, batsman1: "Amit Sharma (24*)", batsman2: "Rohit Verma (15)", bowler: "Zaheer Khan (2/12)" },
+                    team2: { score: 43, wickets: 5, overs: 5, batsman1: "Rahul Dravid (12)", batsman2: "Sachin Tendulkar (8)", bowler: "Vikram Singh (3/8)" }
+                },
+                result: "Mavericks CC won by 15 runs",
+                topPerformer: "Vikram Singh (3/8 & 10 runs)"
+            }
+        ];
+
+        class CricketApp {
+            constructor() {
+                this.teams = DB.get('teams', initialTeams);
+                this.tournaments = DB.get('tournaments', initialTournaments);
+                this.history = DB.get('history', initialHistory);
+                this.currentMatch = DB.get('currentMatch', null);
+                this.currentView = 'dashboard';
+                
+                // Active configuration temporary states
+                this.setupMatchState = { team1: '', team2: '', overs: 5, customOvers: '' };
+            }
+
+            save() {
+                DB.set('teams', this.teams);
+                DB.set('tournaments', this.tournaments);
+                DB.set('history', this.history);
+                DB.set('currentMatch', this.currentMatch);
+            }
+
+            resetToSampleData() {
+                localStorage.clear();
+                this.teams = [...initialTeams];
+                this.tournaments = [...initialTournaments];
+                this.history = [...initialHistory];
+                this.currentMatch = null;
+                this.save();
+                this.switchView('dashboard');
+                alert("Demo match telemetry injected successfully.");
+            }
+
+            switchView(view) {
+                this.currentView = view;
+                // Update Nav UI
+                document.querySelectorAll('nav button').forEach(btn => {
+                    btn.classList.remove('text-emerald-400');
+                    btn.classList.add('text-slate-400');
+                });
+                const activeNav = document.getElementById(`nav-${view}`);
+                if (activeNav) {
+                    activeNav.classList.remove('text-slate-400');
+                    activeNav.classList.add('text-emerald-400');
+                }
+                this.render();
+            }
+
+            render() {
+                const container = document.getElementById('view-container');
+                container.innerHTML = '';
+                
+                if (this.currentView === 'dashboard') this.renderDashboard(container);
+                else if (this.currentView === 'teams') this.renderTeams(container);
+                else if (this.currentView === 'history') this.renderHistory(container);
+                else if (this.currentView === 'tournaments') this.renderTournaments(container);
+                else if (this.currentView === 'live-scoring') this.renderLiveScoring(container);
+                else if (this.currentView === 'setup-match') this.renderSetupMatch(container);
+
+                lucide.createIcons();
+            }
+
+            // ==========================================
+            // DASHBOARD VIEW
+            // ==========================================
+            renderDashboard(container) {
+                let currentMatchCard = `
+                    <div class="bg-slate-800/40 border border-slate-800 rounded-xl p-6 text-center">
+                        <i data-lucide="shield-alert" class="w-8 h-8 text-slate-500 mx-auto mb-2"></i>
+                        <p class="text-sm text-slate-400 mb-4">No match currently active</p>
+                        <button onclick="app.switchView('setup-match')" class="w-full bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold py-3 px-4 rounded-xl transition shadow-lg shadow-emerald-500/10 flex items-center justify-center gap-2 text-sm">
+                            <i data-lucide="circle-play" class="w-4 h-4"></i> Start New Match
+                        </button>
+                    </div>`;
+
+                if (this.currentMatch) {
+                    const m = this.currentMatch;
+                    const crr = m.ballsBowled > 0 ? ((m.runs / m.ballsBowled) * 6).toFixed(2) : "0.00";
+                    const overStr = `${Math.floor(m.ballsBowled / 6)}.${m.ballsBowled % 6}`;
+                    currentMatchCard = `
+                        <div onclick="app.switchView('live-scoring')" class="bg-gradient-to-br from-emerald-950/40 to-slate-900 border border-emerald-500/30 rounded-xl p-4 cursor-pointer hover:border-emerald-500/50 transition relative overflow-hidden group">
+                            <div class="absolute top-0 right-0 bg-emerald-500 text-slate-950 text-[10px] font-bold px-3 py-1 uppercase tracking-wider rounded-bl-lg animate-pulse">LIVE</div>
+                            <div class="text-xs text-emerald-400 font-semibold mb-2 flex items-center gap-1">
+                                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> ${m.team1Name} vs ${m.team2Name}
+                            </div>
+                            <div class="flex justify-between items-center my-2">
+                                <div>
+                                    <span class="text-3xl font-black tracking-tight text-slate-50">${m.runs}/${m.wickets}</span>
+                                    <span class="text-xs text-slate-400 ml-2 font-medium">Overs: ${overStr}/${m.totalOvers}</span>
+                                </div>
+                                <div class="text-right">
+                                    <p class="text-xs text-slate-400">CRR</p>
+                                    <p class="text-sm font-bold text-emerald-400">${crr}</p>
+                                </div>
+                            </div>
+                            <div class="border-t border-slate-800/80 pt-3 mt-2 grid grid-cols-2 text-xs text-slate-400 gap-2">
+                                <div class="truncate"><strong class="text-slate-200">🏏 ${m.batsmen[m.strikerIndex]?.name || 'Striker'}</strong>: ${m.batsmen[m.strikerIndex]?.runs || 0}(${m.batsmen[m.strikerIndex]?.balls || 0})</div>
+                                <div class="truncate text-right"><strong class="text-slate-200">🥎 ${m.currentBowler?.name || 'Bowler'}</strong>: ${m.currentBowler?.wickets || 0}/${m.currentBowler?.runsGiven || 0}</div>
+                            </div>
+                        </div>`;
+                }
+
+                let historyHTML = '';
+                this.history.slice(0, 3).forEach(h => {
+                    historyHTML += `
+                        <div class="bg-slate-800/50 border border-slate-800/80 rounded-xl p-3 text-xs flex justify-between items-center hover:border-slate-700 transition">
+                            <div class="space-y-1">
+                                <div class="font-semibold text-slate-200">${h.team1Name} vs ${h.team2Name}</div>
+                                <div class="text-emerald-400 font-medium text-[11px]">${h.result}</div>
+                            </div>
+                            <div class="text-right">
+                                <div class="text-slate-400">${h.date}</div>
+                                <div class="text-[10px] text-slate-500 font-medium">⭐ ${h.topPerformer.split(' ')[0]}</div>
+                            </div>
+                        </div>`;
+                });
+
+                container.innerHTML = `
+                    <div class="space-y-5">
+                        <div>
+                            <h2 class="text-sm font-bold uppercase tracking-wider text-slate-400 mb-2.5">Active Match</h2>
+                            ${currentMatchCard}
+                        </div>
+                        <div>
+                            <div class="flex justify-between items-center mb-2.5">
+                                <h2 class="text-sm font-bold uppercase tracking-wider text-slate-400">Recent Matches</h2>
+                                <button onclick="app.switchView('history')" class="text-xs text-emerald-400 font-semibold hover:underline">View All</button>
+                            </div>
+                            <div class="space-y-2">${historyHTML || '<p class="text-xs text-slate-500 py-4 text-center">No historic match logs saved.</p>'}</div>
+                        </div>
+                    </div>`;
+            }
+
+            // ==========================================
+            // SETUP MATCH VIEW
+            // ==========================================
+            renderSetupMatch(container) {
+                if(this.teams.length < 2) {
+                    container.innerHTML = `
+                        <div class="bg-slate-800/40 border border-slate-800 rounded-xl p-6 text-center space-y-3">
+                            <i data-lucide="users" class="w-8 h-8 text-slate-500 mx-auto"></i>
+                            <p class="text-sm text-slate-400">You need at least 2 teams created to start a match.</p>
+                            <button onclick="app.switchView('teams')" class="bg-emerald-500 text-slate-950 px-4 py-2 rounded-lg font-bold text-xs">Create Teams</button>
+                        </div>`;
+                    return;
+                }
+
+                let teamOptions = `<option value="">Select a Team</option>`;
+                this.teams.forEach(t => { teamOptions += `<option value="${t.id}">${t.name}</option>`; });
+
+                container.innerHTML = `
+                    <div class="bg-slate-800/40 border border-slate-800 rounded-xl p-4 space-y-4">
+                        <h2 class="text-base font-bold text-slate-100 flex items-center gap-2"><i data-lucide="swords" class="w-5 h-5 text-emerald-400"></i> Configure Match Engine</h2>
+                        
+                        <div class="space-y-1">
+                            <label class="text-xs font-semibold text-slate-400">Batting Team (Team 1)</label>
+                            <select id="setup-t1" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-emerald-500">${teamOptions}</select>
+                        </div>
+
+                        <div class="space-y-1">
+                            <label class="text-xs font-semibold text-slate-400">Bowling Team (Team 2)</label>
+                            <select id="setup-t2" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-emerald-500">${teamOptions}</select>
+                        </div>
+
+                        <div class="space-y-1">
+                            <label class="text-xs font-semibold text-slate-400">Match Length (Overs)</label>
+                            <div class="grid grid-cols-5 gap-2" id="overs-grid">
+                                ${[2, 5, 10, 20].map(ov => `<button onclick="document.querySelectorAll('.ov-btn').forEach(b=>b.classList.remove('bg-emerald-500','text-slate-950')); this.classList.add('bg-emerald-500','text-slate-950'); app.setupMatchState.overs=${ov}" class="ov-btn border border-slate-700 bg-slate-900 rounded-lg py-2 text-xs font-bold transition ${ov===5?'bg-emerald-500 text-slate-950':''}">${ov}</button>`).join('')}
+                                <input type="number" id="setup-custom-overs" placeholder="Custom" class="bg-slate-900 border border-slate-700 rounded-lg text-center text-xs text-slate-200 focus:outline-none focus:border-emerald-500" oninput="document.querySelectorAll('.ov-btn').forEach(b=>b.classList.remove('bg-emerald-500','text-slate-950')); app.setupMatchState.overs=parseInt(this.value)||5">
+                            </div>
+                        </div>
+
+                        <button onclick="app.initiateMatchEngine()" class="w-full bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold py-3 px-4 rounded-xl transition shadow-lg text-sm mt-2">
+                            Initialize Engine
+                        </button>
+                    </div>`;
+            }
+
+            initiateMatchEngine() {
+                const t1Id = document.getElementById('setup-t1').value;
+                const t2Id = document.getElementById('setup-t2').value;
+                if (!t1Id || !t2Id || t1Id === t2Id) return alert("Select two different valid teams.");
+
+                const team1 = this.teams.find(t => t.id === t1Id);
+                const team2 = this.teams.find(t => t.id === t2Id);
+
+                this.currentMatch = {
+                    team1Id: t1Id, team2Id: t2Id,
+                    team1Name: team1.name, team2Name: team2.name,
+                    runs: 0, wickets: 0, ballsBowled: 0,
+                    totalOvers: this.setupMatchState.overs,
+                    batsmen: [
+                        { name: team1.players[0] || "Batsman 1", runs: 0, balls: 0, fours: 0, sixes: 0, out: false },
+                        { name: team1.players[1] || "Batsman 2", runs: 0, balls: 0, fours: 0, sixes: 0, out: false }
+                    ],
+                    strikerIndex: 0, nonStrikerIndex: 1,
+                    currentBowler: { name: team2.players[10] || "Bowler", runsGiven: 0, ballsBowled: 0, wickets: 0 },
+                    thisOver: [],
+                    history: [] // Frame telemetry storage for undo arrays
+                };
+                this.save();
+                this.switchView('live-scoring');
+            }
+
+            // ==========================================
+            // LIVE SCORING VIEW (The Match Tracking Engine)
+            // ==========================================
+            renderLiveScoring(container) {
+                if (!this.currentMatch) return this.switchView('dashboard');
+                const m = this.currentMatch;
+
+                const crr = m.ballsBowled > 0 ? ((m.runs / m.ballsBowled) * 6).toFixed(2) : "0.00";
+                const overStr = `${Math.floor(m.ballsBowled / 6)}.${m.ballsBowled % 6}`;
+
+                const s = m.batsmen[m.strikerIndex];
+                const ns = m.batsmen[m.nonStrikerIndex];
+                const b = m.currentBowler;
+
+                container.innerHTML = `
+                    <div class="space-y-4">
+                        <div class="bg-gradient-to-b from-slate-800 to-slate-900 border border-slate-800 rounded-2xl p-4 shadow-xl">
+                            <div class="flex justify-between items-center text-xs text-slate-400 font-semibold border-b border-slate-800 pb-2 mb-3">
+                                <span>🏏 INNINGS 1</span>
+                                <span class="bg-emerald-500/10 text-emerald-400 px-2 py-0.5 rounded-full text-[10px]">TARGET: N/A</span>
+                            </div>
+                            <div class="flex justify-between items-end">
+                                <div>
+                                    <h2 class="text-2xl font-black tracking-tight text-slate-100">${m.team1Name}</h2>
+                                    <div class="text-4xl font-black text-emerald-400 my-1 tracking-tight">${m.runs}<span class="text-2xl text-slate-400 font-normal">/${m.wickets}</span></div>
+                                    <p class="text-xs text-slate-400 font-medium">Overs: <span class="text-slate-200 font-bold">${overStr}</span> / ${m.totalOvers}</p>
+                                </div>
+                                <div class="text-right space-y-1">
+                                    <div class="text-xs text-slate-400">Run Rate: <span class="text-slate-200 font-bold">${crr}</span></div>
+                                </div>
+                            </div>
+                            
+                            <div class="mt-4 pt-3 border-t border-slate-800/60 flex items-center gap-2">
+                                <span class="text-[10px] uppercase font-bold text-slate-500 tracking-wider">This Over:</span>
+                                <div class="flex gap-1.5 overflow-x-auto no-scrollbar">
+                                    ${m.thisOver.map(ball => `<span class="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${ball==='W'?'bg-rose-500 text-white':(ball===4||ball===6)?'bg-amber-500 text-slate-950':'bg-slate-800 text-slate-300 border border-slate-700'}">${ball}</span>`).join('') || '<span class="text-xs text-slate-500 italic">First ball pending...</span>'}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="bg-slate-800/30 border border-slate-800 rounded-xl p-3 space-y-2.5">
+                            <div class="grid grid-cols-12 text-xs font-bold text-slate-400 border-b border-slate-800/60 pb-1.5 px-1">
+                                <div class="col-span-6">Batter</div>
+                                <div class="col-span-2 text-center">R</div>
+                                <div class="col-span-2 text-center">B</div>
+                                <div class="col-span-1 text-center">4s</div>
+                                <div class="col-span-1 text-center">6s</div>
+                            </div>
+                            <div class="grid grid-cols-12 text-xs font-medium px-1 ${m.strikerIndex===0?'text-emerald-400 font-semibold':''}">
+                                <div class="col-span-6 truncate">${s?.name || 'Striker'}🏏</div>
+                                <div class="col-span-2 text-center font-bold">${s?.runs || 0}</div>
+                                <div class="col-span-2 text-center text-slate-400">${s?.balls || 0}</div>
+                                <div class="col-span-1 text-center text-slate-400">${s?.fours || 0}</div>
+                                <div class="col-span-1 text-center text-slate-400">${s?.sixes || 0}</div>
+                            </div>
+                            <div class="grid grid-cols-12 text-xs font-medium px-1 ${m.strikerIndex===1?'text-emerald-400 font-semibold':''}">
+                                <div class="col-span-6 truncate">${ns?.name || 'Non-Striker'}</div>
+                                <div class="col-span-2 text-center font-bold">${ns?.runs || 0}</div>
+                                <div class="col-span-2 text-center text-slate-400">${ns?.balls || 0}</div>
+                                <div class="col-span-1 text-center text-slate-400">${ns?.fours || 0}</div>
+                                <div class="col-span-1 text-center text-slate-400">${ns?.sixes || 0}</div>
+                            </div>
+                            <div class="grid grid-cols-12 text-xs font-medium border-t border-slate-800/60 pt-2 px-1 text-slate-300">
+                                <div class="col-span-6 truncate text-slate-400">🥎 Bowler</div>
+                                <div class="col-span-2 text-center font-bold">${b?.runsGiven || 0}</div>
+                                <div class="col-span-2 text-center text-slate-400">${b?.ballsBowled || 0} b</div>
+                                <div class="col-span-4 text-right pr-1 font-bold text-rose-400">${b?.wickets || 0} W</div>
+                            </div>
+                        </div>
+
+                        <div class="space-y-2 mt-4">
+                            <div class="grid grid-cols-4 gap-2">
+                                ${[0, 1, 2, 3].map(r => `<button onclick="app.registerBall(${r}, 'run')" class="bg-slate-800 hover:bg-slate-700 active:scale-95 text-xl font-black py-4 rounded-xl border border-slate-700/60 transition duration-700 shadow-sm">${r}</button>`).join('')}
+                            </div>
+                            <div class="grid grid-cols-3 gap-2">
+                                <button onclick="app.registerBall(4, 'run')" class="bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 text-xl font-black py-4 rounded-xl active:scale-95 transition">4</button>
+                                <button onclick="app.registerBall(6, 'run')" class="bg-emerald-500 hover:bg-emerald-600 text-slate-950 text-xl font-black py-4 rounded-xl active:scale-95 transition shadow-lg shadow-emerald-500/10">6</button>
+                                <button onclick="app.registerBall(0, 'wicket')" class="bg-rose-500 hover:bg-rose-600 text-white text-base font-black py-4 rounded-xl active:scale-95 transition tracking-wider uppercase">OUT</button>
+                            </div>
+                            <div class="grid grid-cols-4 gap-1.5">
+                                <button onclick="app.registerBall(1, 'wd')" class="bg-slate-900 border border-slate-800 hover:bg-slate-800 text-[11px] font-bold py-2 rounded-lg text-slate-400">WD</button>
+                                <button onclick="app.registerBall(1, 'nb')" class="bg-slate-900 border border-slate-800 hover:bg-slate-800 text-[11px] font-bold py-2 rounded-lg text-slate-400">NB</button>
+                                <button onclick="app.registerBall(1, 'by')" class="bg-slate-900 border border-slate-800 hover:bg-slate-800 text-[11px] font-bold py-2 rounded-lg text-slate-400">BYE</button>
+                                <button onclick="app.registerBall(1, 'lb')" class="bg-slate-900 border border-slate-800 hover:bg-slate-800 text-[11px] font-bold py-2 rounded-lg text-slate-400">LEG-B</button>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-3 pt-2">
+                            <button onclick="app.undoLastBall()" class="border border-slate-800 bg-slate-900 hover:bg-slate-800 text-xs text-slate-400 font-semibold py-2.5 rounded-lg flex items-center justify-center gap-2">
+                                <i data-lucide="undo-2" class="w-4 h-4"></i> Undo Ball
+                            </button>
+                            <button onclick="app.finalizeMatchLog()" class="border border-rose-500/30 bg-rose-500/10 hover:bg-rose-500/20 text-xs text-rose-400 font-semibold py-2.5 rounded-lg flex items-center justify-center gap-2">
+                                <i data-lucide="shield-check" class="w-4 h-4"></i> End Match
+                            </button>
+                        </div>
+                    </div>`;
+            }
+
+            registerBall(value, type) {
+                if (!this.currentMatch) return;
+                
+                // Deep copy state framework frame tracking for granular undo functions
+                this.currentMatch.history.push(JSON.stringify({
+                    runs: this.currentMatch.runs,
+                    wickets: this.currentMatch.wickets,
+                    ballsBowled: this.currentMatch.ballsBowled,
+                    batsmen: JSON.parse(JSON.stringify(this.currentMatch.batsmen)),
+                    strikerIndex: this.currentMatch.strikerIndex,
+                    nonStrikerIndex: this.currentMatch.nonStrikerIndex,
+                    currentBowler: { ...this.currentMatch.currentBowler },
+                    thisOver: [...this.currentMatch.thisOver]
+                }));
+
+                const m = this.currentMatch;
+                let striker = m.batsmen[m.strikerIndex];
+                let bowler = m.currentBowler;
+
+                if (type === 'run') {
+                    m.runs += value;
+                    if(striker) {
+                        striker.runs += value;
+                        striker.balls += 1;
+                        if (value === 4) striker.fours += 1;
+                        if (value === 6) striker.sixes += 1;
+                    }
+                    if(bowler) {
+                        bowler.runsGiven += value;
+                        bowler.ballsBowled += 1;
+                    }
+                    m.ballsBowled += 1;
+                    m.thisOver.push(value);
+                    
+                    // Rotate strike on odd run matrices
+                    if (value % 2 !== 0) this.rotateStrike();
+
+                } else if (type === 'wicket') {
+                    m.wickets += 1;
+                    if(striker) {
+                        striker.balls += 1;
+                        striker.out = true;
+                    }
+                    if(bowler) {
+                        bowler.ballsBowled += 1;
+                        bowler.wickets += 1;
+                    }
+                    m.ballsBowled += 1;
+                    m.thisOver.push('W');
+
+                    // Prompt or substitute next context player name assignment seamlessly
+                    const nextPlayerIndex = m.wickets + 1;
+                    const nextPlayerName = this.teams.find(t => t.id === m.team1Id)?.players[nextPlayerIndex] || `Batter ${nextPlayerIndex + 1}`;
+                    m.batsmen[m.strikerIndex] = { name: nextPlayerName, runs: 0, balls: 0, fours: 0, sixes: 0, out: false };
+
+                } else if (type === 'wd' || type === 'nb') {
+                    m.runs += value; // 1 run penalty addition
+                    if(bowler) bowler.runsGiven += value;
+                    m.thisOver.push(type.toUpperCase());
+                } else if (type === 'by' || type === 'lb') {
+                    m.runs += value;
+                    m.ballsBowled += 1;
+                    if(striker) striker.balls += 1;
+                    if(bowler) bowler.ballsBowled += 1;
+                    m.thisOver.push(value + type.toUpperCase());
+                    if (value % 2 !== 0) this.rotateStrike();
+                }
+
+                // Check for natural dynamic Over completion rotation thresholds
+                if (type !== 'wd' && type !== 'nb' && m.ballsBowled % 6 === 0 && m.ballsBowled > 0) {
+                    this.rotateStrike();
+                    m.thisOver = [];
+                    // Simple programmatic prompt array rotation simulation for bowler variations
+                    const team2 = this.teams.find(t => t.id === m.team2Id);
+                    if(team2) {
+                        const nextBowlerIndex = Math.floor(Math.random() * 10);
+                        m.currentBowler = { name: team2.players[nextBowlerIndex] || "Bowler", runsGiven: 0, ballsBowled: 0, wickets: 0 };
+                    }
+                }
+
+                // Max overs safety validation lifecycle completion check
+                if (m.ballsBowled >= m.totalOvers * 6) {
+                    alert("Innings maximum configuration limit reached.");
+                    this.finalizeMatchLog();
+                    return;
+                }
+
+                this.save();
+                this.render();
+            }
+
+            rotateStrike() {
+                const temp = this.currentMatch.strikerIndex;
+                this.currentMatch.strikerIndex = this.currentMatch.nonStrikerIndex;
+                this.currentMatch.nonStrikerIndex = temp;
+            }
+
+            undoLastBall() {
+                if (!this.currentMatch || this.currentMatch.history.length === 0) return;
+                const lastState = JSON.parse(this.currentMatch.history.pop());
+                Object.assign(this.currentMatch, lastState);
+                this.save();
+                this.render();
+            }
+
+            finalizeMatchLog() {
+                if (!this.currentMatch) return;
+                const m = this.currentMatch;
+                
+                const log = {
+                    id: "m-" + Date.now(),
+                    team1Name: m.team1Name,
+                    team2Name: m.team2Name,
+                    date: new Date().toISOString().split('T')[0],
+                    overs: m.totalOvers,
+                    scorecard: {
+                        team1: { score: m.runs, wickets: m.wickets, overs: `${Math.floor(m.ballsBowled/6)}.${m.ballsBowled%6}`, batsman1: `${m.batsmen[0]?.name || 'Batter 1'}: ${m.batsmen[0]?.runs || 0}`, batsman2: `${m.batsmen[1]?.name || 'Batter 2'}: ${m.batsmen[1]?.runs || 0}`, bowler: `${m.currentBowler?.name}: ${m.currentBowler?.wickets}/${m.currentBowler?.runsGiven}` },
+                        team2: { score: 0, wickets: 0, overs: 0, batsman1: 'N/A', batsman2: 'N/A', bowler: 'N/A' }
+                    },
+                    result: `${m.team1Name} scored ${m.runs}/${m.wickets} in configured match framework.`,
+                    topPerformer: `${m.batsmen[0]?.name || 'Top Batsman'} (${m.batsmen[0]?.runs || 0} runs)`
+                };
+
+                this.history.unshift(log);
+                this.currentMatch = null;
+                this.save();
+                this.switchView('history');
+            }
+
+            // ==========================================
+            // TEAMS VIEW MANAGEMENT
+            // ==========================================
+            renderTeams(container) {
+                let teamsHTML = '';
+                this.teams.forEach(t => {
+                    teamsHTML += `
+                        <div class="bg-slate-800/40 border border-slate-800 rounded-xl p-4 space-y-2">
+                            <div class="flex justify-between items-center">
+                                <h3 class="font-bold text-sm text-emerald-400">${t.name}</h3>
+                                <span class="text-[10px] bg-slate-800 border border-slate-700 px-2 py-0.5 rounded-full text-slate-400 font-semibold">${t.players.length} Squad Base</span>
+                            </div>
+                            <p class="text-xs text-slate-400 truncate">${t.players.slice(0, 5).join(', ')}...</p>
+                        </div>`;
+                });
+
+                container.innerHTML = `
+                    <div class="space-y-4">
+                        <div class="bg-slate-800/40 border border-slate-800 rounded-xl p-4 space-y-3">
+                            <h2 class="text-sm font-bold uppercase tracking-wider text-slate-300">Register New Squad</h2>
+                            <div class="space-y-2">
+                                <input type="text" id="new-team-name" placeholder="Team Name (e.g., Rising Stars CC)" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-emerald-500">
+                                <textarea id="new-team-players" placeholder="Player names separated by commas (Min 2 recommended)" rows="2" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-emerald-500"></textarea>
+                                <button onclick="app.createNewTeam()" class="w-full bg-emerald-500 text-slate-950 font-bold py-2 rounded-xl text-xs transition">Save Squad Data</button>
+                            </div>
+                        </div>
+                        <div class="space-y-2">
+                            <h2 class="text-sm font-bold uppercase tracking-wider text-slate-400">Available Franchises</h2>
+                            <div class="space-y-2">${teamsHTML || '<p class="text-xs text-slate-500 py-4 text-center">No franchises cataloged.</p>'}</div>
+                        </div>
+                    </div>`;
+            }
+
+            createNewTeam() {
+                const nameInput = document.getElementById('new-team-name');
+                const playersInput = document.getElementById('new-team-players');
+                
+                if (!nameInput.value.trim()) return alert("Enter valid Team configuration identity name.");
+                const dynamicList = playersInput.value.split(',').map(p => p.trim()).filter(p => p.length > 0);
+                
+                const newTeam = {
+                    id: "t-" + Date.now(),
+                    name: nameInput.value.trim(),
+                    players: dynamicList.length > 0 ? dynamicList : ["Player 1", "Player 2", "Player 3", "Player 4", "Player 5"]
+                };
+
+                this.teams.push(newTeam);
+                this.save();
+                this.render();
+            }
+
+            // ==========================================
+            // MATCH LOG HISTORY ARCHIVE VIEW
+            // ==========================================
+            renderHistory(container) {
+                let historyHTML = '';
+                this.history.forEach(h => {
+                    historyHTML += `
+                        <div class="bg-slate-800/40 border border-slate-800 rounded-xl p-4 space-y-3 shadow-md">
+                            <div class="flex justify-between items-center border-b border-slate-800/80 pb-2">
+                                <span class="text-xs font-bold text-slate-200">${h.team1Name} vs ${h.team2Name}</span>
+                                <span class="text-[10px] text-slate-500">${h.date}</span>
+                            </div>
+                            <div class="grid grid-cols-2 gap-2 text-xs">
+                                <div>
+                                    <p class="text-[10px] uppercase font-bold text-slate-500">${h.team1Name}</p>
+                                    <p class="font-bold text-slate-200">${h.scorecard.team1.score} Runs (${h.scorecard.team1.overs} ov)</p>
+                                    <p class="text-[10px] text-slate-400 truncate">${h.scorecard.team1.batsman1}</p>
+                                </div>
+                                <div class="border-l border-slate-800/80 pl-2">
+                                    <p class="text-[10px] uppercase font-bold text-slate-500">MVP / Status</p>
+                                    <p class="font-medium text-emerald-400 text-[11px]">${h.result}</p>
+                                    <p class="text-[10px] text-slate-400 truncate">⭐ ${h.topPerformer}</p>
+                                </div>
+                            </div>
+                        </div>`;
+                });
+
+                container.innerHTML = `
+                    <div class="space-y-3">
+                        <div class="flex items-center justify-between mb-1">
+                            <h2 class="text-sm font-bold uppercase tracking-wider text-slate-400">Match Ledger History Archive</h2>
+                            <i data-lucide="archive" class="w-4 h-4 text-slate-500"></i>
+                        </div>
+                        <div class="space-y-2">${historyHTML || '<p class="text-xs text-slate-500 py-8 text-center">No historic match data recorded.</p>'}</div>
+                    </div>`;
+            }
+
+            // ==========================================
+            // TOURNAMENTS / LEAGUE MANAGEMENT VIEW
+            // ==========================================
+            renderTournaments(container) {
+                let tourneysHTML = '';
+                this.tournaments.forEach(tourney => {
+                    let sortedTeams = Object.keys(tourney.pointsTable).sort((a,b) => tourney.pointsTable[b].points - tourney.pointsTable[a].points);
+                    
+                    let tableRows = '';
+                    sortedTeams.forEach((teamId, index) => {
+                        const stats = tourney.pointsTable[teamId];
+                        const tObj = this.teams.find(t => t.id === teamId);
+                        tableRows += `
+                            <tr class="text-xs border-b border-slate-800/50">
+                                <td class="py-2 text-slate-400 font-bold">${index+1}</td>
+                                <td class="py-2 font-semibold text-slate-200 truncate max-w-[100px]">${tObj ? tObj.name : teamId}</td>
+                                <td class="py-2 text-center text-slate-300">${stats.matches}</td>
+                                <td class="py-2 text-center font-bold text-emerald-400">${stats.wins}</td>
+                                <td class="py-2 text-center text-slate-300">${stats.nrr > 0 ? '+'+stats.nrr : stats.nrr}</td>
+                                <td class="py-2 text-center font-black text-slate-50">${stats.points}</td>
+                            </tr>`;
+                    });
+
+                    tourneysHTML += `
+                        <div class="bg-slate-800/30 border border-slate-800 rounded-2xl p-4 space-y-3">
+                            <div class="flex items-center justify-between border-b border-slate-800/80 pb-2">
+                                <h3 class="font-bold text-sm text-emerald-400 flex items-center gap-2"><i data-lucide="award" class="w-4 h-4"></i> ${tourney.name}</h3>
+                                <span class="text-[10px] bg-emerald-500/10 text-emerald-400 font-bold px-2 py-0.5 rounded-full">Active</span>
+                            </div>
+                            
+                            <table class="w-full text-left border-collapse">
+                               <thead>
+                                   <tr class="text-[10px] uppercase text-slate-500 border-b border-slate-800 font-bold">
+                                       <th class="pb-1.5 w-6">#</th>
+                                       <th class="pb-1.5">Team</th>
+                                       <th class="pb-1.5 text-center w-8">M</th>
+                                       <th class="pb-1.5 text-center w-8">W</th>
+                                       <th class="pb-1.5 text-center w-12">NRR</th>
+                                       <th class="pb-1.5 text-center w-8">PTS</th>
+                                   </tr>
+                               </thead>
+                               <tbody>${tableRows}</tbody>
+                            </table>
+                        </div>`;
+                });
+
+                container.innerHTML = `
+                    <div class="space-y-4">
+                        <div class="bg-slate-800/40 border border-slate-800 rounded-xl p-4 space-y-3">
+                            <h2 class="text-sm font-bold uppercase tracking-wider text-slate-300">Construct Championship League</h2>
+                            <div class="space-y-2">
+                                <input type="text" id="new-tourney-name" placeholder="Championship Name (e.g., Winter Bracket)" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-emerald-500">
+                                <button onclick="app.createNewTournament()" class="w-full bg-emerald-500 text-slate-950 font-bold py-2 rounded-xl text-xs transition">Create League Matrix</button>
+                            </div>
+                        </div>
+                        <div class="space-y-3">
+                            <h2 class="text-sm font-bold uppercase tracking-wider text-slate-400">Live Tournaments Table Standings</h2>
+                            ${tourneysHTML || '<p class="text-xs text-slate-500 py-4 text-center">No competitive tournaments active.</p>'}
+                        </div>
+                    </div>`;
+            }
+
+            createNewTournament() {
+                const nameInput = document.getElementById('new-tourney-name');
+                if(!nameInput.value.trim()) return alert("Enter tournament league framework identifier title.");
+                
+                if(this.teams.length < 2) return alert("Ensure at least 2 active structural teams exist first.");
+
+                const pt = {};
+                this.teams.forEach(t => {
+                    pt[t.id] = { matches: 0, wins: 0, losses: 0, nrr: 0.00, points: 0 };
+                });
+
+                const newTourney = {
+                    id: "tourney-" + Date.now(),
+                    name: nameInput.value.trim(),
+                    teams: this.teams.map(t => t.id),
+                    pointsTable: pt,
+                    schedule: []
+                };
+
+                this.tournaments.push(newTourney);
+                this.save();
+                this.render();
+            }
+        }
+
+        // Initialize Runtime Engine on view lifecycle load
+        const app = new CricketApp();
+        document.addEventListener("DOMContentLoaded", () => app.render());
+    </script>
+</body>
+</html>
